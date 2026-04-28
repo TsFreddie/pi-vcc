@@ -13,10 +13,12 @@ export interface PiVccSettings {
    *   - /compact (no args)
    *   - /compact <text>
    *   - auto threshold / overflow
-   *   - /pi-vcc (always handled regardless)
    *
-   * When false (default), pi-vcc only handles /pi-vcc; everything else
+   * When false, pi-vcc only handles explicit /pi-vcc; everything else
    * falls back to pi core's default LLM-based compaction.
+   *
+   * Note: the upstream default is `false`; this fork flips it to `true`
+   * so VCC feels like a built-in pi feature (no opt-in required).
    */
   overrideDefaultCompaction: boolean;
   /**
@@ -40,7 +42,7 @@ export interface PiVccSettings {
 }
 
 export const DEFAULT_SETTINGS: PiVccSettings = {
-  overrideDefaultCompaction: false,
+  overrideDefaultCompaction: true,
   smartKeepTail: true,
   continueAfterThresholdCompact: true,
   debug: false,

@@ -8,7 +8,18 @@ import { calibrateCharsPerToken, estimateMessageContentChars, estimateTokensFrom
 import type { PiVccCompactionDetails } from "../details";
 import type { CompactionReason } from "../types";
 
+// Re-export for backward compatibility with downstream consumers (e.g. tests,
+// the (now-removed) /pi-vcc command). The /compress command uses
+// setBypassToPiCore() below to opt out of VCC for a single compaction.
 export { PI_VCC_COMPACT_INSTRUCTION } from "../core/compact-args";
+
+/**
+ * One-shot bypass flag: when set, the next session_before_compact event
+ * will skip VCC and let pi-core handle it (LLM-based compaction).
+ * The /compress command sets this before calling ctx.compact().
+ */
+let bypassToPiCore = false;
+export const setBypassToPiCore = () => { bypassToPiCore = true; };
 
 export interface CompactionStats {
   summarized: number;
@@ -28,7 +39,6 @@ export interface CompactionStats {
 }
 
 let lastStats: CompactionStats | null = null;
-let lastCompactWasPiVcc = false;
 let pendingFollowUpPrompt: string | null = null;
 const AUTO_CONTINUE_CUSTOM_TYPE = "pi-vcc-auto-continue";
 const AUTO_CONTINUE_PROMPT = "Continue from where you left off after automatic context compaction. Do not restate the compaction summary; proceed with the task.";
@@ -355,7 +365,13 @@ export const registerBeforeCompactHook = (pi: ExtensionAPI) => {
     const { reason, willRetry } = readCompactionEventContext(event);
     const settings = loadSettings();
 
-    // Always handle explicit /pi-vcc marker.
+    // /compress bypass: hand off to pi-core for this one compaction.
+    if (bypassToPiCore) {
+      bypassToPiCore = false;
+      return;
+    }
+
+    // Always handle explicit /pi-vcc marker (when present in customInstructions).
     // Otherwise, only handle when user opted in via settings.
     const { isPiVcc, keepUserTurns, keepUserTurnsExplicit, followUpPrompt } = parseCompactionInstructions(customInstructions);
     pendingFollowUpPrompt = null;
@@ -558,8 +574,6 @@ export const registerBeforeCompactHook = (pi: ExtensionAPI) => {
       willRetry,
     };
 
-    lastCompactWasPiVcc = isPiVcc;
-
     return {
       compaction: {
         summary,
@@ -570,14 +584,13 @@ export const registerBeforeCompactHook = (pi: ExtensionAPI) => {
     };
   });
 
-  // Fire success toast for /compact path only (delayed to let UI settle).
-  // /pi-vcc path uses its own onComplete callback in the command handler.
+  // Fire success toast (delayed to let UI settle). /compress bypass means
+  // event.fromExtension is false (pi-core handled it), so we naturally skip it.
   pi.on("session_compact", async (event, ctx) => {
     const { reason, willRetry } = readCompactionEventContext(event);
     if (!event.fromExtension) return;
     const followUpPrompt = pendingFollowUpPrompt;
     pendingFollowUpPrompt = null;
-    if (lastCompactWasPiVcc) return; // /pi-vcc handles its own toast via onComplete
     if (willRetry) return;
     const stats = lastStats;
     if (!stats) return;
