@@ -8,23 +8,11 @@ const settingsPath = (): string => process.env.PI_VCC_CONFIG_PATH ?? SETTINGS_PA
 export const SETTINGS_PATH = settingsPath();
 
 export interface PiVccSettings {
-  /**
-   * When true, pi-vcc handles ALL compactions:
-   *   - /compact (no args)
-   *   - /compact <text>
-   *   - auto threshold / overflow
-   *   - /pi-vcc (always handled regardless)
-   *
-   * When false (default), pi-vcc only handles /pi-vcc; everything else
-   * falls back to pi core's default LLM-based compaction.
-   */
-  overrideDefaultCompaction: boolean;
   /** Write debug snapshot to /tmp/pi-vcc-debug.json on each compaction. */
   debug: boolean;
 }
 
 export const DEFAULT_SETTINGS: PiVccSettings = {
-  overrideDefaultCompaction: false,
   debug: false,
 };
 

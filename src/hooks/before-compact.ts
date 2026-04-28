@@ -5,7 +5,8 @@ import { compile } from "../core/summarize";
 import { loadSettings, type PiVccSettings } from "../core/settings";
 import type { PiVccCompactionDetails } from "../details";
 
-export const PI_VCC_COMPACT_INSTRUCTION = "__pi_vcc__";
+let bypassToPiCore = false;
+export const setBypassToPiCore = () => { bypassToPiCore = true; };
 
 export interface CompactionStats {
   summarized: number;
@@ -14,7 +15,6 @@ export interface CompactionStats {
 }
 
 let lastStats: CompactionStats | null = null;
-let lastCompactWasPiVcc = false;
 export const getLastCompactionStats = () => lastStats;
 
 const formatTokens = (n: number): string => {
@@ -139,13 +139,14 @@ const REASON_MESSAGES: Record<OwnCutCancelReason, string> = {
 
 export const registerBeforeCompactHook = (pi: ExtensionAPI) => {
   pi.on("session_before_compact", (event, ctx) => {
-    const { preparation, branchEntries, customInstructions } = event;
+    const { preparation, branchEntries } = event;
     const settings = loadSettings();
 
-    // Always handle explicit /pi-vcc marker.
-    // Otherwise, only handle when user opted in via settings.
-    const isPiVcc = customInstructions === PI_VCC_COMPACT_INSTRUCTION;
-    if (!isPiVcc && !settings.overrideDefaultCompaction) return;
+    // Check if /compress was invoked — bypass to pi-core.
+    if (bypassToPiCore) {
+      bypassToPiCore = false;
+      return; // Let pi-core handle it
+    }
 
     const ownCut = buildOwnCut(branchEntries as any[]);
     if (!ownCut.ok) {
@@ -178,7 +179,6 @@ export const registerBeforeCompactHook = (pi: ExtensionAPI) => {
       dbg(settings, {
         cancelled: true,
         reason: ownCut.reason,
-        isPiVcc,
         counts: {
           total: branchEntries.length,
           messages: (branchEntries as any[]).filter((e: any) => e.type === "message").length,
@@ -283,8 +283,6 @@ export const registerBeforeCompactHook = (pi: ExtensionAPI) => {
       previousSummaryUsed: Boolean(preparation.previousSummary),
     };
 
-    lastCompactWasPiVcc = isPiVcc;
-
     return {
       compaction: {
         summary,
@@ -295,11 +293,9 @@ export const registerBeforeCompactHook = (pi: ExtensionAPI) => {
     };
   });
 
-  // Fire success toast for /compact path only (delayed to let UI settle).
-  // /pi-vcc path uses its own onComplete callback in the command handler.
+  // Fire success toast (delayed to let UI settle).
   pi.on("session_compact", (event, ctx) => {
     if (!event.fromExtension) return;
-    if (lastCompactWasPiVcc) return; // /pi-vcc handles its own toast via onComplete
     const stats = lastStats;
     if (!stats) return;
     setTimeout(() => {
