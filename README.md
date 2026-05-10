@@ -1,4 +1,4 @@
-This is a customized version of the original pi-vcc extension:
+This is a customized version of the original pi-vcc extension, modified to make the VCC experience feel more like a built-in pi feature:
 - Defaults auto-compaction and `/compact` to vcc compaction.
 - Removes `/pi-vcc` command.
 - Renames `/pi-vcc-recall` to `/recall`.
