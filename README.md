@@ -57,14 +57,14 @@ pi -e https://github.com/sting8k/pi-vcc
 
 ## Usage
 
-pi-vcc runs automatically when your context window fills up (if `overrideDefaultCompaction` is enabled), or on-demand via commands.
+pi-vcc runs automatically when your context window fills up, or on-demand via commands.
 
 ### Compaction
 
 - **`/pi-vcc`** — manual compaction, keeps the last 1 user turn by default.
 - **`/pi-vcc keep:N [prompt]`** — keep the last `N` user turns; optional prompt is sent to the agent after compaction.
   - `keep:1` = default, `keep:0` = compact everything, no tail.
-- By default `/compact` and auto-threshold go through Pi core. Set `overrideDefaultCompaction: true` to let pi-vcc handle all paths.
+- By default pi-vcc also handles `/compact` and auto-threshold compactions. Set `overrideDefaultCompaction: false` to send those paths back to Pi core.
 - **Smart keep**: when enabled, pi-vcc auto-boosts `keep:1` to a larger N if the tail is small enough (< 5k tokens, capped at 20k).
 
 ### Compacted message structure
@@ -152,14 +152,14 @@ Config lives at `~/.pi/agent/pi-vcc-config.json` (auto-scaffolded on first load 
 
 ```json
 {
-  "overrideDefaultCompaction": false,
+  "overrideDefaultCompaction": true,
   "smartKeepTail": true,
   "continueAfterThresholdCompact": true,
   "debug": false
 }
 ```
 
-- **`overrideDefaultCompaction`** *(default `false`)*: when `false`, pi-vcc only runs for `/pi-vcc`; `/compact` and auto-threshold compactions fall through to pi core. Set `true` to make pi-vcc handle all compaction paths.
+- **`overrideDefaultCompaction`** *(default `true`)*: when `true`, pi-vcc handles all compaction paths — `/pi-vcc`, `/compact`, and auto-threshold/overflow. Set `false` to restrict pi-vcc to `/pi-vcc` and let the rest fall through to pi core. Existing config files keep whatever value they already have.
 - **`smartKeepTail`** *(default `true`)*: when `true`, pi-vcc boosts the default `keep:1` to the largest `N` whose tail stays ≤ 20k tokens, but only when the `keep:1` tail is already small (≤ 5k tokens). Explicit `keep:N` from the user is always respected.
 - **`continueAfterThresholdCompact`** *(default `true`)*: when `true`, pi-vcc asks the agent to continue after a successful automatic compaction (threshold or overflow), avoiding a UX cliff where the agent stops after compaction instead of continuing the task.
 - **`debug`** *(default `false`)*: when `true`, each compaction writes detailed info to `/tmp/pi-vcc-debug.json` — message counts, cut boundary, summary preview, sections, token estimate calibration.

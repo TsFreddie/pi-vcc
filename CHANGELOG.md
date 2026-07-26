@@ -4,9 +4,13 @@ All notable changes to `@sting8k/pi-vcc` are documented in this file.
 
 ## [0.4.1]
 
+### Changes
+
+- **`overrideDefaultCompaction` now defaults to `true`** — fresh installs let pi-vcc handle `/compact` and auto-threshold/overflow compaction, not just `/pi-vcc`. Existing config files keep their stored value; set `false` to restore pi core's LLM-based compaction for those paths.
+
 ### Fixes
 
-- **File activity: recognise lowercase `read`** — `FILE_READ_TOOLS` only matched `Read`/`read_file`/`View`, so Pi's lowercase `read` tool never registered and `[Files And Changes]` emitted no `Read:` line at all (0 of 179 audited sessions produced one).
+- **File activity: case-insensitive tool matching** — `FILE_READ_TOOLS`/`FILE_WRITE_TOOLS`/`FILE_CREATE_TOOLS` were exact-match sets, so Pi's lowercase `read` tool never registered and `[Files And Changes]` emitted no `Read:` line at all (0 of 179 audited sessions produced one). Matching is now case-insensitive, mirroring the `/i` tool regexes in `core/rank.ts`.
 - **File activity: recognise modern edit tools** — `quick_edit`, `target_edit` and `apply_patch` are ranked as edits in `src/core/rank.ts` but were missing from `FILE_WRITE_TOOLS`, so files changed through them never appeared under `Modified:`.
 - **File activity: use hook-provided file ops** — `buildSections` never received `CompileInput.fileOps`, so the hook's authoritative read/modified sets were dropped before the summary was built. `extractFiles` already accepted the argument; it is now wired through.
 

@@ -9,14 +9,15 @@ export const SETTINGS_PATH = settingsPath();
 
 export interface PiVccSettings {
   /**
-   * When true, pi-vcc handles ALL compactions:
+   * When true (default), pi-vcc handles ALL compactions:
    *   - /compact (no args)
    *   - /compact <text>
    *   - auto threshold / overflow
    *   - /pi-vcc (always handled regardless)
    *
-   * When false (default), pi-vcc only handles /pi-vcc; everything else
-   * falls back to pi core's default LLM-based compaction.
+   * When false, pi-vcc only handles /pi-vcc; everything else falls back to
+   * pi core's default LLM-based compaction. Existing config files keep their
+   * stored value; the new default applies to fresh installs only.
    */
   overrideDefaultCompaction: boolean;
   /**
@@ -40,7 +41,7 @@ export interface PiVccSettings {
 }
 
 export const DEFAULT_SETTINGS: PiVccSettings = {
-  overrideDefaultCompaction: false,
+  overrideDefaultCompaction: true,
   smartKeepTail: true,
   continueAfterThresholdCompact: true,
   debug: false,
