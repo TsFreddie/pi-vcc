@@ -7,18 +7,25 @@ interface FileActivity {
   created: Set<string>;
 }
 
+// Tool names are matched case-insensitively (see `matches`), mirroring the /i
+// regexes in core/rank.ts. Entries must be lowercase.
 const FILE_READ_TOOLS = new Set([
-  "Read", "read", "read_file", "View",
+  "read", "read_file", "view",
 ]);
 
+// Multi-file patch tools (apply_patch) carry their paths inside the diff payload,
+// not in a path arg, so extractPath yields nothing for them; those files are
+// recovered from the hook-provided fileOps below.
 const FILE_WRITE_TOOLS = new Set([
-  "Edit", "Write", "edit", "write", "edit_file", "write_file",
-  "MultiEdit", "quick_edit", "target_edit", "apply_patch",
+  "edit", "write", "edit_file", "write_file",
+  "multiedit", "quick_edit", "target_edit", "apply_patch",
 ]);
 
 const FILE_CREATE_TOOLS = new Set([
-  "Write", "write", "write_file",
+  "write", "write_file",
 ]);
+
+const matches = (tools: Set<string>, name: string): boolean => tools.has(name.toLowerCase());
 
 /**
  * Find the longest common directory prefix among absolute paths.
@@ -63,9 +70,9 @@ export const extractFiles = (
     const p = extractPath(b.args);
     if (!p) continue;
 
-    if (FILE_READ_TOOLS.has(b.name)) act.read.add(p);
-    if (FILE_WRITE_TOOLS.has(b.name)) act.modified.add(p);
-    if (FILE_CREATE_TOOLS.has(b.name)) act.created.add(p);
+    if (matches(FILE_READ_TOOLS, b.name)) act.read.add(p);
+    if (matches(FILE_WRITE_TOOLS, b.name)) act.modified.add(p);
+    if (matches(FILE_CREATE_TOOLS, b.name)) act.created.add(p);
   }
 
   const all = [...act.read, ...act.modified, ...act.created];
