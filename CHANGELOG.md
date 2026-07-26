@@ -2,7 +2,7 @@
 
 All notable changes to `@sting8k/pi-vcc` are documented in this file.
 
-## [0.4.1]
+## [0.5.0]
 
 ### Changes
 
