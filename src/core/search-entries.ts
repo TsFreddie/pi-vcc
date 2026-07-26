@@ -72,6 +72,12 @@ const safeRegex = (pattern: string): RegExp => {
  * Wall-clock budget for one search. A normal query over 400 entries takes ~10ms,
  * so this only trips on pathological patterns that survive `hasNestedQuantifier`.
  * Aborting loudly beats returning a silently truncated match count.
+ *
+ * This is a per-entry checkpoint, not a hard per-call ceiling: JavaScript cannot
+ * interrupt a running `RegExp.test`, so a single pathological entry still runs to
+ * completion and the overshoot is caught on the next iteration. That bounds the
+ * damage to one entry instead of the whole corpus, which is the point — the
+ * unbounded case was N entries multiplied by the per-entry cost.
  */
 const SEARCH_BUDGET_MS = 3000;
 
