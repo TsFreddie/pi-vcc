@@ -2,6 +2,16 @@
 
 All notable changes to `@sting8k/pi-vcc` are documented in this file.
 
+## [0.4.1]
+
+### Fixes
+
+- **File activity: recognise lowercase `read`** — `FILE_READ_TOOLS` only matched `Read`/`read_file`/`View`, so Pi's lowercase `read` tool never registered and `[Files And Changes]` emitted no `Read:` line at all (0 of 179 audited sessions produced one).
+- **File activity: recognise modern edit tools** — `quick_edit`, `target_edit` and `apply_patch` are ranked as edits in `src/core/rank.ts` but were missing from `FILE_WRITE_TOOLS`, so files changed through them never appeared under `Modified:`.
+- **File activity: use hook-provided file ops** — `buildSections` never received `CompileInput.fileOps`, so the hook's authoritative read/modified sets were dropped before the summary was built. `extractFiles` already accepted the argument; it is now wired through.
+
+Audit on 790 real sessions: weighted recall 63.6% → 74.5% (median 68.2% → 79.3%), weighted fact density 6.00 → 7.08, summary size +6% (4183 → 4433 chars).
+
 ## [0.4.0]
 
 ### Features
