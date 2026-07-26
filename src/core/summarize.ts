@@ -173,7 +173,7 @@ interface CompileWithBriefBlocksOptions {
 const compileWithBriefBlocks = (input: CompileInput, options: CompileWithBriefBlocksOptions = {}): string => {
   const blocks = filterNoise(normalize(input.messages));
   const briefBlocks = options.briefBlocksFor?.(blocks);
-  const data = buildSections({ blocks, briefBlocks });
+  const data = buildSections({ blocks, briefBlocks, fileOps: input.fileOps });
   const fresh = formatSummary(data, { capBriefTranscript: options.capFreshBrief ?? true });
   // Strip any legacy RECALL_NOTE baked into prev summary (pre-fix format)
   // so merge doesn't re-stack it inside the brief.

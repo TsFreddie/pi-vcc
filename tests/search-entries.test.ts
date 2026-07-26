@@ -142,3 +142,64 @@ describe("searchEntries", () => {
     expect(snip).not.toContain("line 3");
   });
 });
+
+describe("searchEntries regex safety", () => {
+  const corpus = (n: number) => {
+    const entries: any[] = [];
+    const messages: any[] = [];
+    for (let i = 0; i < n; i++) {
+      const body = "a".repeat(40) + "b";
+      entries.push({ index: i, role: "user", summary: body, files: [] });
+      messages.push({ role: "user", content: [{ type: "text", text: body }] });
+    }
+    return { entries, messages };
+  };
+
+  it("treats nested-quantifier patterns as literals instead of hanging", () => {
+    const { entries, messages } = corpus(20);
+    const t0 = Date.now();
+    const hits = searchEntries(entries, messages, "(a+)+$");
+    expect(Date.now() - t0).toBeLessThan(1000);
+    expect(hits.length).toBe(0); // matched literally, not as a pattern
+  });
+
+  it("still honours legitimate regex queries", () => {
+    const entries: any[] = [
+      { index: 0, role: "user", summary: "deploy to staging", files: [] },
+      { index: 1, role: "user", summary: "deploy to prod", files: [] },
+    ];
+    const messages: any[] = entries.map((e) => ({
+      role: "user",
+      content: [{ type: "text", text: e.summary }],
+    }));
+    const hits = searchEntries(entries, messages, "stag(ing|e)");
+    expect(hits.length).toBe(1);
+    expect(hits[0].index).toBe(0);
+  });
+});
+
+describe("searchEntries mode fallback", () => {
+  const texts = [
+    "We decided to drop the Redis cache because invalidation kept breaking staging.",
+    "The auth flow now uses short-lived tokens refreshed by the gateway.",
+    "Ran the migration script; it failed on the users table and we rolled back.",
+  ];
+  const entries: any[] = texts.map((t, i) => ({ index: i, role: "user", summary: t, files: [] }));
+  const messages: any[] = texts.map((t) => ({ role: "user", content: [{ type: "text", text: t }] }));
+
+  it("falls back to term search when punctuation forces the regex path", () => {
+    // A trailing "?" makes looksLikeRegex treat the whole sentence as one pattern.
+    expect(searchEntries(entries, messages, "why did we drop the cache?").length)
+      .toBe(searchEntries(entries, messages, "why did we drop the cache").length);
+  });
+
+  it("keeps regex results when the pattern actually matches", () => {
+    const hits = searchEntries(entries, messages, "auth|migration");
+    expect(hits.length).toBe(2);
+    expect(hits.every((h) => h.matchCount === 1)).toBe(true); // regex path, not term path
+  });
+
+  it("returns nothing when neither mode matches", () => {
+    expect(searchEntries(entries, messages, "kubernetes").length).toBe(0);
+  });
+});

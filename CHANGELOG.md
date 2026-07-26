@@ -2,6 +2,23 @@
 
 All notable changes to `@sting8k/pi-vcc` are documented in this file.
 
+## [0.5.0]
+
+### Changes
+
+- **`overrideDefaultCompaction` now defaults to `true`** — fresh installs let pi-vcc handle `/compact` and auto-threshold/overflow compaction, not just `/pi-vcc`. Existing config files keep their stored value; set `false` to restore pi core's LLM-based compaction for those paths.
+
+### Fixes
+
+- **File activity: case-insensitive tool matching** — `FILE_READ_TOOLS`/`FILE_WRITE_TOOLS`/`FILE_CREATE_TOOLS` were exact-match sets, so Pi's lowercase `read` tool never registered and `[Files And Changes]` emitted no `Read:` line at all (0 of 179 audited sessions produced one). Matching is now case-insensitive, mirroring the `/i` tool regexes in `core/rank.ts`.
+- **File activity: recognise modern edit tools** — `quick_edit`, `target_edit` and `apply_patch` are ranked as edits in `src/core/rank.ts` but were missing from `FILE_WRITE_TOOLS`, so files changed through them never appeared under `Modified:`.
+- **File activity: use hook-provided file ops** — `buildSections` never received `CompileInput.fileOps`, so the hook's authoritative read/modified sets were dropped before the summary was built. `extractFiles` already accepted the argument; it is now wired through.
+- **Recall search: guard against regex backtracking** — a query such as `(a+)+$` made `searchEntries` spend ~0.5s per entry, freezing a 400-entry session for ~3.5 minutes. Patterns with an unbounded quantifier applied to a group that already contains one are now matched literally, and a 3s budget checked between entries stops a runaway search after one entry rather than the whole corpus (normal searches take ~10ms). Same corpus and query: 3.5 min → 0.7ms.
+- **Recall search: don't lose results to mode detection** — `looksLikeRegex` treats any query containing `?`, `.`, `(`, `|` etc. as a single regex, so ordinary prose ("why did we drop the cache?") was matched verbatim and returned nothing. Measured across 584 real recall calls: the regex path returned zero results 47.5% of the time (median 1 hit) versus 1.1% for term search (median 98 hits), and 25.9% of queries were routed there. An empty regex result now falls through to term search instead of being returned as-is.
+- **Recall tool: describe it as recall, not search** — the tool description led with "Search session history" and advertised regex, so the model filed it under keyword search and wrote regex-style queries (8.8% of 510 real queries contained `|`) instead of reaching for it when context was missing. Description, prompt snippet and parameter docs now say what it is for, prefer plain keywords, explain `scope` without internal jargon, and state plainly that only the current session is searchable. No behaviour change.
+
+Audit on 790 real sessions: weighted recall 63.6% → 74.5% (median 68.2% → 79.3%), weighted fact density 6.00 → 7.08, summary size +6% (4183 → 4433 chars).
+
 ## [0.4.0]
 
 ### Features

@@ -10,7 +10,7 @@ const DEFAULT_RECENT = 25;
 
 export const registerVccRecallCommand = (pi: ExtensionAPI) => {
   pi.registerCommand("pi-vcc-recall", {
-    description: "Search session history. Defaults to active lineage; add scope:all for off-lineage branches.",
+    description: "Recall earlier parts of this session. Plain keywords work best; add scope:all to reach edited or retried turns.",
     handler: async (args: string, ctx) => {
       const sessionFile = ctx.sessionManager.getSessionFile();
       if (!sessionFile) {

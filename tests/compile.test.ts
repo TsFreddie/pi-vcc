@@ -87,3 +87,16 @@ describe("compile", () => {
     expect(maxLineLength).toBeLessThanOrEqual(120);
   });
 });
+
+describe("compile fileOps wiring", () => {
+  it("renders hook-provided file ops in the summary", () => {
+    // Guards the seam: CompileInput.fileOps -> buildSections -> extractFiles.
+    // Without it the hook's authoritative read/modified sets are silently dropped.
+    const out = compile({
+      messages: [userMsg("check the config")],
+      fileOps: { readFiles: ["src/only-from-hook.ts"], modifiedFiles: ["src/changed-by-hook.ts"] },
+    });
+    expect(out).toContain("only-from-hook.ts");
+    expect(out).toContain("changed-by-hook.ts");
+  });
+});

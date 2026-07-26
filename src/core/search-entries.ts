@@ -12,13 +12,85 @@ export interface SearchHit extends RenderedEntry {
 const escapeRegex = (s: string): string =>
   s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** Try to compile as regex; fall back to escaped literal. */
+/** Quantifier starting at `i`, if any. Only unbounded forms (+, *, {n,}) can
+ *  drive catastrophic backtracking. */
+const quantifierAt = (p: string, i: number): { len: number; unbounded: boolean } => {
+  const c = p[i];
+  if (c === "+" || c === "*") return { len: 1, unbounded: true };
+  if (c === "{") {
+    const end = p.indexOf("}", i);
+    const body = end === -1 ? "" : p.slice(i + 1, end);
+    if (/^\d+(,\d*)?$/.test(body)) return { len: end - i + 1, unbounded: body.endsWith(",") };
+  }
+  return { len: 0, unbounded: false };
+};
+
+/**
+ * Detect an unbounded quantifier applied to a group that already contains one,
+ * e.g. `(a+)+` or `(\w*)*`. That shape makes the engine explore exponentially
+ * many splits on a non-matching input. Alternation overlap like `(a|a)+` is not
+ * covered here; the search budget in `searchEntries` is the backstop.
+ */
+const hasNestedQuantifier = (pattern: string): boolean => {
+  const groups: boolean[] = []; // per open group: contains an unbounded quantifier
+  let inClass = false;
+  for (let i = 0; i < pattern.length; i++) {
+    const c = pattern[i];
+    if (c === "\\") { i++; continue; }
+    if (inClass) { if (c === "]") inClass = false; continue; }
+    if (c === "[") { inClass = true; continue; }
+    if (c === "(") { groups.push(false); continue; }
+    if (c === ")") {
+      const inner = groups.pop() ?? false;
+      const q = quantifierAt(pattern, i + 1);
+      if (inner && q.unbounded) return true;
+      if (groups.length) groups[groups.length - 1] ||= inner || q.unbounded;
+      i += q.len;
+      continue;
+    }
+    const q = quantifierAt(pattern, i);
+    if (q.unbounded && groups.length) {
+      groups[groups.length - 1] = true;
+      i += q.len - 1;
+    }
+  }
+  return false;
+};
+
+/** Try to compile as regex; fall back to escaped literal. Patterns with nested
+ *  unbounded quantifiers are treated as literals rather than compiled. */
 const safeRegex = (pattern: string): RegExp => {
+  if (hasNestedQuantifier(pattern)) return new RegExp(escapeRegex(pattern), "i");
   try {
     return new RegExp(pattern, "i");
   } catch {
     return new RegExp(escapeRegex(pattern), "i");
   }
+};
+
+/**
+ * Wall-clock budget for one search. A normal query over 400 entries takes ~10ms,
+ * so this only trips on pathological patterns that survive `hasNestedQuantifier`.
+ * Aborting loudly beats returning a silently truncated match count.
+ *
+ * This is a per-entry checkpoint, not a hard per-call ceiling: JavaScript cannot
+ * interrupt a running `RegExp.test`, so a single pathological entry still runs to
+ * completion and the overshoot is caught on the next iteration. That bounds the
+ * damage to one entry instead of the whole corpus, which is the point — the
+ * unbounded case was N entries multiplied by the per-entry cost.
+ */
+const SEARCH_BUDGET_MS = 3000;
+
+const startBudget = (): (() => void) => {
+  const deadline = Date.now() + SEARCH_BUDGET_MS;
+  return () => {
+    if (Date.now() > deadline) {
+      throw new Error(
+        `Search aborted: query exceeded ${SEARCH_BUDGET_MS}ms. Simplify the pattern — ` +
+        "nested quantifiers such as (a+)+ can make matching blow up.",
+      );
+    }
+  };
 };
 
 /** Detect if the query looks like a single regex pattern (contains regex metacharacters). */
@@ -27,15 +99,7 @@ const looksLikeRegex = (query: string): boolean =>
 
 /** Build a regex for snippet highlighting — matches first available term. */
 const snippetRegex = (terms: string[]): RegExp => {
-  const alts = terms.map((t) => {
-    try {
-      // Validate that it's a valid regex
-      new RegExp(t, "i");
-      return t;
-    } catch {
-      return escapeRegex(t);
-    }
-  });
+  const alts = terms.map((t) => safeRegex(t).source);
   return new RegExp(alts.join("|"), "i");
 };
 
@@ -87,12 +151,13 @@ interface BM25Context {
 }
 
 /** Precompute IDF and avgDl across all docs. */
-const buildBM25Context = (docs: string[], terms: string[]): BM25Context => {
+const buildBM25Context = (docs: string[], terms: string[], checkBudget: () => void): BM25Context => {
   const n = docs.length;
   const df = new Map<string, number>();
   let totalLen = 0;
 
   for (const doc of docs) {
+    checkBudget();
     totalLen += doc.split(/\s+/).length;
     for (const t of terms) {
       if (safeRegex(t).test(doc)) {
@@ -163,13 +228,21 @@ export const searchEntries = (
   if (!query?.trim()) return entries;
 
   const rawQuery = query.trim();
+  const checkBudget = startBudget();
 
-  // If query looks like a single regex pattern (contains metacharacters),
-  // treat the whole thing as one pattern — don't split into terms
+  // If the query looks like a single regex pattern (contains metacharacters),
+  // treat the whole thing as one pattern — don't split into terms.
+  //
+  // The detection is deliberately loose, so ordinary prose trips it: a trailing
+  // "?" or "." turns the whole sentence into one pattern that must match
+  // verbatim. On real sessions that path returned nothing 47.5% of the time
+  // versus 1.1% for term search. Mode detection must never silently lose
+  // results, so an empty regex result falls through to term search below.
   if (looksLikeRegex(rawQuery)) {
     const regex = safeRegex(rawQuery);
     const hits: SearchHit[] = [];
     for (let i = 0; i < entries.length; i++) {
+      checkBudget();
       const e = entries[i];
       const msg = messages[i];
       const text = msg ? fullText(msg) : e.summary;
@@ -180,7 +253,7 @@ export const searchEntries = (
         hits.push({ ...e, snippet: snip, matchCount: 1 });
       }
     }
-    return hits;
+    if (hits.length > 0) return hits;
   }
 
   // Natural language / multi-word query: BM25 scoring
@@ -198,10 +271,11 @@ export const searchEntries = (
     docs.push(`${e.role} ${text} ${filePart}`);
   }
 
-  const ctx = buildBM25Context(docs, terms);
+  const ctx = buildBM25Context(docs, terms, checkBudget);
 
   const scored: Array<{ hit: SearchHit; score: number }> = [];
   for (let i = 0; i < entries.length; i++) {
+    checkBudget();
     const e = entries[i];
     const hay = docs[i];
     const mc = countMatches(hay, terms);
