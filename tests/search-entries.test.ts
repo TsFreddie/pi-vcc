@@ -142,3 +142,38 @@ describe("searchEntries", () => {
     expect(snip).not.toContain("line 3");
   });
 });
+
+describe("searchEntries regex safety", () => {
+  const corpus = (n: number) => {
+    const entries: any[] = [];
+    const messages: any[] = [];
+    for (let i = 0; i < n; i++) {
+      const body = "a".repeat(40) + "b";
+      entries.push({ index: i, role: "user", summary: body, files: [] });
+      messages.push({ role: "user", content: [{ type: "text", text: body }] });
+    }
+    return { entries, messages };
+  };
+
+  it("treats nested-quantifier patterns as literals instead of hanging", () => {
+    const { entries, messages } = corpus(20);
+    const t0 = Date.now();
+    const hits = searchEntries(entries, messages, "(a+)+$");
+    expect(Date.now() - t0).toBeLessThan(1000);
+    expect(hits.length).toBe(0); // matched literally, not as a pattern
+  });
+
+  it("still honours legitimate regex queries", () => {
+    const entries: any[] = [
+      { index: 0, role: "user", summary: "deploy to staging", files: [] },
+      { index: 1, role: "user", summary: "deploy to prod", files: [] },
+    ];
+    const messages: any[] = entries.map((e) => ({
+      role: "user",
+      content: [{ type: "text", text: e.summary }],
+    }));
+    const hits = searchEntries(entries, messages, "stag(ing|e)");
+    expect(hits.length).toBe(1);
+    expect(hits[0].index).toBe(0);
+  });
+});

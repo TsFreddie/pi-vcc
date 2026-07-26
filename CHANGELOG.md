@@ -13,6 +13,7 @@ All notable changes to `@sting8k/pi-vcc` are documented in this file.
 - **File activity: case-insensitive tool matching** — `FILE_READ_TOOLS`/`FILE_WRITE_TOOLS`/`FILE_CREATE_TOOLS` were exact-match sets, so Pi's lowercase `read` tool never registered and `[Files And Changes]` emitted no `Read:` line at all (0 of 179 audited sessions produced one). Matching is now case-insensitive, mirroring the `/i` tool regexes in `core/rank.ts`.
 - **File activity: recognise modern edit tools** — `quick_edit`, `target_edit` and `apply_patch` are ranked as edits in `src/core/rank.ts` but were missing from `FILE_WRITE_TOOLS`, so files changed through them never appeared under `Modified:`.
 - **File activity: use hook-provided file ops** — `buildSections` never received `CompileInput.fileOps`, so the hook's authoritative read/modified sets were dropped before the summary was built. `extractFiles` already accepted the argument; it is now wired through.
+- **Recall search: guard against regex backtracking** — a query such as `(a+)+$` made `searchEntries` spend ~0.5s per entry, freezing a 400-entry session for ~3.5 minutes. Patterns with an unbounded quantifier applied to a group that already contains one are now matched literally, and a 3s wall-clock budget aborts any search that still runs away (normal searches take ~10ms). Same corpus and query: 3.5 min → 0.7ms.
 
 Audit on 790 real sessions: weighted recall 63.6% → 74.5% (median 68.2% → 79.3%), weighted fact density 6.00 → 7.08, summary size +6% (4183 → 4433 chars).
 
