@@ -177,3 +177,29 @@ describe("searchEntries regex safety", () => {
     expect(hits[0].index).toBe(0);
   });
 });
+
+describe("searchEntries mode fallback", () => {
+  const texts = [
+    "We decided to drop the Redis cache because invalidation kept breaking staging.",
+    "The auth flow now uses short-lived tokens refreshed by the gateway.",
+    "Ran the migration script; it failed on the users table and we rolled back.",
+  ];
+  const entries: any[] = texts.map((t, i) => ({ index: i, role: "user", summary: t, files: [] }));
+  const messages: any[] = texts.map((t) => ({ role: "user", content: [{ type: "text", text: t }] }));
+
+  it("falls back to term search when punctuation forces the regex path", () => {
+    // A trailing "?" makes looksLikeRegex treat the whole sentence as one pattern.
+    expect(searchEntries(entries, messages, "why did we drop the cache?").length)
+      .toBe(searchEntries(entries, messages, "why did we drop the cache").length);
+  });
+
+  it("keeps regex results when the pattern actually matches", () => {
+    const hits = searchEntries(entries, messages, "auth|migration");
+    expect(hits.length).toBe(2);
+    expect(hits.every((h) => h.matchCount === 1)).toBe(true); // regex path, not term path
+  });
+
+  it("returns nothing when neither mode matches", () => {
+    expect(searchEntries(entries, messages, "kubernetes").length).toBe(0);
+  });
+});
