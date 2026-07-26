@@ -1,4 +1,4 @@
-import type { NormalizedBlock } from "../types";
+import type { FileOps, NormalizedBlock } from "../types";
 import { clip, clipSentence, nonEmptyLines } from "./content";
 import type { SectionData } from "../sections";
 import { extractGoals } from "../extract/goals";
@@ -10,6 +10,8 @@ import { buildBriefSections, stringifyBrief } from "./brief";
 export interface BuildSectionsInput {
   blocks: NormalizedBlock[];
   briefBlocks?: NormalizedBlock[];
+  /** Hook-provided file activity; authoritative for files touched before this compaction. */
+  fileOps?: FileOps;
 }
 
 const BLOCKER_RE =
@@ -39,8 +41,8 @@ const extractOutstandingContext = (blocks: NormalizedBlock[]): string[] => {
   return items.slice(0, 5);
 };
 
-const formatFileActivity = (blocks: NormalizedBlock[]): string[] => {
-  const act = extractFiles(blocks);
+const formatFileActivity = (blocks: NormalizedBlock[], fileOps?: FileOps): string[] => {
+  const act = extractFiles(blocks, fileOps);
   // Dedup: if already Modified, drop from Created (file existed before)
   for (const p of act.modified) act.created.delete(p);
   const lines: string[] = [];
@@ -66,7 +68,7 @@ export const buildSections = (input: BuildSectionsInput): SectionData => {
   return {
     sessionGoal,
     outstandingContext: extractOutstandingContext(blocks),
-    filesAndChanges: formatFileActivity(blocks),
+    filesAndChanges: formatFileActivity(blocks, input.fileOps),
     commits: formatCommits(extractCommits(blocks)),
     userPreferences,
     briefTranscript: stringifyBrief(briefSections),

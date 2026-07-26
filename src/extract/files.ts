@@ -8,12 +8,12 @@ interface FileActivity {
 }
 
 const FILE_READ_TOOLS = new Set([
-  "Read", "read_file", "View",
+  "Read", "read", "read_file", "View",
 ]);
 
 const FILE_WRITE_TOOLS = new Set([
   "Edit", "Write", "edit", "write", "edit_file", "write_file",
-  "MultiEdit",
+  "MultiEdit", "quick_edit", "target_edit", "apply_patch",
 ]);
 
 const FILE_CREATE_TOOLS = new Set([
