@@ -117,9 +117,9 @@ Sections appear only when relevant — a session with no git commits won't have 
 
 Pi's default compaction discards old messages permanently. After compaction, the agent only sees the summary.
 
-`vcc_recall` bypasses this by reading the raw session JSONL file directly. By default it searches only the active conversation lineage, regardless of how many compactions have happened. Use `scope:"all"` only when you intentionally want to include off-lineage branches.
+`vcc_recall` bypasses this by reading the raw session JSONL file directly, so anything dropped by compaction stays reachable. By default it covers the active conversation lineage, regardless of how many compactions have happened. Use `scope:"all"` to also reach messages from other branches, such as turns that were edited or retried. Scope is limited to the current session — earlier sessions are not searchable.
 
-Queries support **regex** and **multi-word OR logic** ranked by relevance:
+**Plain keywords work best.** Multi-word queries are OR-matched and ranked by relevance; a regex pattern is also accepted, and if it matches nothing the query falls back to keyword search:
 
 ```
 vcc_recall({ query: "auth token" })                  // active-lineage OR search, ranked
