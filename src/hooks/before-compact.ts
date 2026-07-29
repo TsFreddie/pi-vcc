@@ -10,6 +10,14 @@ import type { CompactionReason } from "../types";
 
 export { PI_VCC_COMPACT_INSTRUCTION } from "../core/compact-args";
 
+/**
+ * One-shot bypass flag: when set, the next session_before_compact event
+ * will skip VCC and let pi-core handle it (LLM-based compaction).
+ * The /compress command sets this before calling ctx.compact().
+ */
+let bypassToPiCore = false;
+export const setBypassToPiCore = () => { bypassToPiCore = true; };
+
 export interface CompactionStats {
   summarized: number;
   kept: number;
@@ -354,6 +362,12 @@ export const registerBeforeCompactHook = (pi: ExtensionAPI) => {
     const { preparation, branchEntries, customInstructions } = event;
     const { reason, willRetry } = readCompactionEventContext(event);
     const settings = loadSettings();
+
+    // /compress bypass: hand off to pi-core for this one compaction.
+    if (bypassToPiCore) {
+      bypassToPiCore = false;
+      return;
+    }
 
     // Always handle explicit /pi-vcc marker.
     // Otherwise, only handle when user opted in via settings.

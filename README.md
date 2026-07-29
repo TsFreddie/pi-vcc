@@ -1,3 +1,5 @@
+> This is a customized fork of [pi-vcc](https://github.com/sting8k/pi-vcc). Commands: `/compact` (VCC), `/recall` (search history), `/compress` (LLM-based).
+
 # pi-vcc
 
 [![npm](https://img.shields.io/npm/v/@sting8k/pi-vcc)](https://www.npmjs.com/package/@sting8k/pi-vcc)

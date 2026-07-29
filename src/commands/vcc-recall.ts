@@ -9,7 +9,7 @@ const PAGE_SIZE = 5;
 const DEFAULT_RECENT = 25;
 
 export const registerVccRecallCommand = (pi: ExtensionAPI) => {
-  pi.registerCommand("pi-vcc-recall", {
+  pi.registerCommand("recall", {
     description: "Recall earlier parts of this session. Plain keywords work best; add scope:all to reach edited or retried turns.",
     handler: async (args: string, ctx) => {
       const sessionFile = ctx.sessionManager.getSessionFile();
@@ -56,7 +56,7 @@ export const registerVccRecallCommand = (pi: ExtensionAPI) => {
         ? `Page ${page}/${totalPages} (${allResults.length} total matches${scopeSuffix})`
         : `${allResults.length} matches${scopeSuffix}`;
       const footer = page < totalPages
-        ? `\n--- /pi-vcc-recall ${query}${parsed.scope === "all" ? " scope:all" : ""} page:${page + 1} ---`
+        ? `\n--- /recall ${query}${parsed.scope === "all" ? " scope:all" : ""} page:${page + 1} ---`
         : "";
       const output = formatRecallOutput(pageResults, query, header) + footer;
       pi.sendMessage({ customType: "vcc-recall", content: output, display: true }, { triggerTurn: true });
