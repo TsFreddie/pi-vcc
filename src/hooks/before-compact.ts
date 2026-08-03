@@ -370,10 +370,12 @@ export const registerBeforeCompactHook = (pi: ExtensionAPI) => {
     }
 
     // Always handle explicit /pi-vcc marker.
-    // Otherwise, only handle when user opted in via settings.
+    // FORK: overrideDefaultCompaction is nullified — pi-vcc always takes over
+    // every compaction path; only /compress (bypassToPiCore above) hands off
+    // to pi core.
     const { isPiVcc, keepUserTurns, keepUserTurnsExplicit, followUpPrompt } = parseCompactionInstructions(customInstructions);
     pendingFollowUpPrompt = null;
-    if (!isPiVcc && !settings.overrideDefaultCompaction) return;
+    // if (!isPiVcc && !settings.overrideDefaultCompaction) return;
 
     const calibrationCut = buildOwnCut(branchEntries as any[], 0);
     const calibrationMessageChars = calibrationCut.ok

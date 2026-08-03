@@ -129,14 +129,15 @@ describe("registerBeforeCompactHook: cancel paths", () => {
     expect(notifyCalls[0].level).toBe("warning");
   });
  
-  test("/compact with override=false short-circuits (no notify, returns undefined)", () => {
+  test("/compact with override=false is still handled by pi-vcc (fork: setting nullified)", () => {
     setConfig({ debug: false, overrideDefaultCompaction: false });
     const { pi, invokeBefore, notifyCalls } = createMockPi();
     registerBeforeCompactHook(pi);
  
     const entries = [msg("m1", "user"), msg("m2", "assistant")];
-    expect(invokeBefore(makeEvent(entries, undefined))).toBeUndefined();
-    expect(notifyCalls).toHaveLength(0);
+    expect(invokeBefore(makeEvent(entries, undefined))).toEqual({ cancel: true });
+    expect(notifyCalls).toHaveLength(1);
+    expect(notifyCalls[0].level).toBe("warning");
   });
  
   test("overflow retry ownCut failure falls back to Pi core instead of cancelling", () => {
